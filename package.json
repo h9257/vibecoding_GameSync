@@ -6,9 +6,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --remote-debugging-port=9222",
-    "package": "electron-packager . GameSync --platform=win32 --arch=x64 --out=dist --overwrite --icon=src/renderer/assets/icon.ico --asar",
-    "package:arm64": "electron-packager . GameSync --platform=win32 --arch=arm64 --out=dist --overwrite --icon=src/renderer/assets/icon.ico --asar",
-    "build": "electron-builder --win",
+    "build:win32x64": "electron-builder --win --x64",
+    "build:win32arm64": "electron-builder --win --arm64",
+    "build:all": "npm run build:win32x64 ; npm run build:win32arm64",
+    "build:t1": "electron-builder --win --x64 --arm64",
     "pack": "electron-builder --dir"
   },
   "author": "GameSync",
@@ -28,7 +29,8 @@
     "productName": "GameSync",
     "win": {
       "target": "nsis",
-      "icon": "src/renderer/assets/icon.ico"
+      "icon": "src/renderer/assets/icon.ico",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

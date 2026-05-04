@@ -66,14 +66,14 @@ npm start
 如果你想生成发给其他用户使用的安装包或绿色版：
 
 ```bash
-# 构建 NSIS 安装包（推荐给普通用户）
-npm run build
+# 构建所有 Windows 版本 (x64 + ARM64)
+npm run build:all
 
-# 打包绿色免安装版目录 (x64)
-npm run package
+# 仅构建 x64 版本
+npm run build:win32x64
 
-# 打包适用于 Windows on ARM 的版本 (骁龙处理器笔记本)
-npm run package:arm64
+# 仅构建 ARM64 版本 (骁龙处理器笔记本)
+npm run build:win32arm64
 ```
 
 打包产物通常会生成在 `dist/` 目录下。
