@@ -207,9 +207,11 @@ class SyncEngine {
 
     const lastSync = new Date(game.lastSyncTime).getTime();
     const lt = localInfo.latestModified, rt = remoteInfo.latestModified;
-    if (lt > lastSync && rt <= lastSync) return { status: 'local_newer', localInfo, remoteInfo };
-    if (rt > lastSync && lt <= lastSync) return { status: 'remote_newer', localInfo, remoteInfo };
-    if (lt > lastSync && rt > lastSync) return { status: 'conflict', localInfo, remoteInfo };
+    const TOLERANCE = 2000; // 2 seconds tolerance for clock drift/precision
+
+    if (lt > lastSync + TOLERANCE && rt <= lastSync + TOLERANCE) return { status: 'local_newer', localInfo, remoteInfo };
+    if (rt > lastSync + TOLERANCE && lt <= lastSync + TOLERANCE) return { status: 'remote_newer', localInfo, remoteInfo };
+    if (lt > lastSync + TOLERANCE && rt > lastSync + TOLERANCE) return { status: 'conflict', localInfo, remoteInfo };
     return { status: 'synced', localInfo, remoteInfo };
   }
 
@@ -222,9 +224,11 @@ class SyncEngine {
     if (localInfo.exists && !remoteInfo.exists) return 'upload';
     if (!game.lastSyncTime) return 'upload';
     const lastSync = new Date(game.lastSyncTime).getTime();
-    if (localInfo.latestModified > lastSync && remoteInfo.latestModified <= lastSync) return 'upload';
-    if (remoteInfo.latestModified > lastSync && localInfo.latestModified <= lastSync) return 'download';
-    if (localInfo.latestModified > lastSync && remoteInfo.latestModified > lastSync) return 'conflict';
+    const TOLERANCE = 2000;
+
+    if (localInfo.latestModified > lastSync + TOLERANCE && remoteInfo.latestModified <= lastSync + TOLERANCE) return 'upload';
+    if (remoteInfo.latestModified > lastSync + TOLERANCE && localInfo.latestModified <= lastSync + TOLERANCE) return 'download';
+    if (localInfo.latestModified > lastSync + TOLERANCE && remoteInfo.latestModified > lastSync + TOLERANCE) return 'conflict';
     return 'synced';
   }
 

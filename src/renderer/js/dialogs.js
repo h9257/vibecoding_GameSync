@@ -252,47 +252,12 @@ class Dialogs {
 
     document.getElementById('detail-game-name').textContent = `${game.icon || '🎮'} ${game.name}`;
 
-    // Load comparison info
-    let compareInfo = '';
-    try {
-      const cmp = await window.api.compareGame(gameId);
-      const statusText = {
-        synced: '✅ 已同步，两端一致',
-        local_newer: '📤 本地有更新，需要上传',
-        remote_newer: '📥 远端有更新，需要下载',
-        conflict: '⚠️ 两端都有更新，存在冲突',
-        local_only: '📤 仅本地有存档',
-        remote_only: '📥 仅远端有存档',
-        never_synced: '🆕 尚未同步过',
-        no_target: '⚠️ 未配置同步目标',
-        empty: '📭 两端都没有存档'
-      };
-      compareInfo = `
-        <div class="settings-section" style="margin-top:0">
-          <div class="settings-section-title">📊 同步状态</div>
-          <div style="font-size:14px;padding:8px 0">${statusText[cmp.status] || cmp.status}</div>
-          ${cmp.localInfo ? `
-          <div class="settings-row">
-            <div>
-              <div class="settings-row-label">本地存档</div>
-              <div class="settings-row-desc">${cmp.localInfo.exists ? `${cmp.localInfo.fileCount} 个文件, ${cmp.localInfo.totalSizeFormatted}, 最后修改: ${cmp.localInfo.latestModifiedDate}` : '不存在'}</div>
-            </div>
-          </div>` : ''}
-          ${cmp.remoteInfo ? `
-          <div class="settings-row">
-            <div>
-              <div class="settings-row-label">远端存档</div>
-              <div class="settings-row-desc">${cmp.remoteInfo.exists ? `最后修改: ${cmp.remoteInfo.latestModifiedDate || '未知'}` : '不存在'}</div>
-            </div>
-          </div>` : ''}
-        </div>
-      `;
-    } catch (e) {
-      compareInfo = `<div style="color:var(--text-muted);font-size:13px">无法获取同步状态</div>`;
-    }
-
+    // Show modal IMMEDIATELY with basic info + loading placeholder for compare data
     document.getElementById('detail-info-content').innerHTML = `
-      ${compareInfo}
+      <div class="settings-section" style="margin-top:0">
+        <div class="settings-section-title">📊 同步状态</div>
+        <div style="font-size:13px;padding:8px 0;color:var(--text-muted)" id="compare-loading">⏳ 正在获取同步状态...</div>
+      </div>
       <div class="settings-section">
         <div class="settings-section-title">📋 游戏信息</div>
         <div class="settings-row">
@@ -324,7 +289,7 @@ class Dialogs {
       </div>
     `;
 
-    // Bind auto-sync toggle
+    // Bind toggles
     const toggle = document.getElementById('toggle-detail-autosync');
     if (toggle) {
       toggle.addEventListener('click', async () => {
@@ -334,8 +299,6 @@ class Dialogs {
         await gameList.load();
       });
     }
-
-    // Bind pack mode toggle
     const packToggle = document.getElementById('toggle-detail-packmode');
     if (packToggle) {
       packToggle.addEventListener('click', async () => {
@@ -354,7 +317,54 @@ class Dialogs {
     document.getElementById('tab-detail-versions').style.display = 'none';
     document.getElementById('tab-detail-filter').style.display = 'none';
 
+    // Open modal FIRST — no waiting
     ui.openModal('modal-game-detail');
+
+    // THEN async load comparison data in background
+    this._loadCompareInfo(gameId);
+  }
+
+  async _loadCompareInfo(gameId) {
+    const placeholder = document.getElementById('compare-loading');
+    if (!placeholder) return;
+    try {
+      const cmp = await window.api.compareGame(gameId);
+      const statusText = {
+        synced: '✅ 已同步，两端一致',
+        local_newer: '📤 本地有更新，需要上传',
+        remote_newer: '📥 远端有更新，需要下载',
+        conflict: '⚠️ 两端都有更新，存在冲突',
+        local_only: '📤 仅本地有存档',
+        remote_only: '📥 仅远端有存档',
+        never_synced: '🆕 尚未同步过',
+        no_target: '⚠️ 未配置同步目标',
+        empty: '📭 两端都没有存档'
+      };
+      // Replace the loading section
+      const section = placeholder.closest('.settings-section');
+      if (section) {
+        section.innerHTML = `
+          <div class="settings-section-title">📊 同步状态</div>
+          <div style="font-size:14px;padding:8px 0">${statusText[cmp.status] || cmp.status}</div>
+          ${cmp.localInfo ? `
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">本地存档</div>
+              <div class="settings-row-desc">${cmp.localInfo.exists ? `${cmp.localInfo.fileCount} 个文件, ${cmp.localInfo.totalSizeFormatted}, 最后修改: ${cmp.localInfo.latestModifiedDate}` : '不存在'}</div>
+            </div>
+          </div>` : ''}
+          ${cmp.remoteInfo ? `
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">远端存档</div>
+              <div class="settings-row-desc">${cmp.remoteInfo.exists ? `最后修改: ${cmp.remoteInfo.latestModifiedDate || '未知'}` : '不存在'}</div>
+            </div>
+          </div>` : ''}
+        `;
+      }
+    } catch (e) {
+      if (placeholder) placeholder.textContent = '无法获取同步状态';
+    }
   }
 
   async loadVersions() {
