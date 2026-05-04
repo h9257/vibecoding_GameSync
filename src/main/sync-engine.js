@@ -46,16 +46,32 @@ class SyncEngine {
       else if (direction === 'conflict') {
         configStore.updateGame(gameId, { syncStatus: 'conflict' });
         this.sendProgress({ gameId, status: 'conflict', message: '存档冲突' });
+        configStore.addSyncHistoryEntry({
+          gameId, gameName: game.name, gameIcon: game.icon || '🎮',
+          direction: 'conflict', status: 'conflict',
+          targetName: target.name, targetType: target.type
+        });
         return { status: 'conflict', gameId };
       }
 
       const now = new Date().toISOString();
-      configStore.updateGame(gameId, { syncStatus: 'synced', lastSyncTime: now });
+      configStore.updateGame(gameId, { syncStatus: 'synced', lastSyncTime: now, lastSyncDirection: direction });
       this.sendComplete({ gameId, direction, message: `${game.name} 同步完成` });
+      configStore.addSyncHistoryEntry({
+        gameId, gameName: game.name, gameIcon: game.icon || '🎮',
+        direction, status: 'success',
+        targetName: target.name, targetType: target.type
+      });
       return { status: 'success', gameId, direction };
     } catch (error) {
       configStore.updateGame(gameId, { syncStatus: 'error' });
       this.sendError({ gameId, message: error.message });
+      configStore.addSyncHistoryEntry({
+        gameId, gameName: game.name, gameIcon: game.icon || '🎮',
+        direction: direction || 'unknown', status: 'error',
+        errorMessage: error.message,
+        targetName: target.name, targetType: target.type
+      });
       throw error;
     }
   }

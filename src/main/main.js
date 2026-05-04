@@ -5,6 +5,7 @@ const gameDatabase = require('./game-database');
 const syncEngine = require('./sync-engine');
 const fileWatcher = require('./file-watcher');
 const trayManager = require('./tray');
+const devServer = require('./dev-server');
 
 let mainWindow = null;
 
@@ -26,6 +27,9 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // Open DevTools automatically for debugging (as requested)
+  // mainWindow.webContents.openDevTools(); // 因为改用浏览器访问了，不需要再弹出 Electron 的调试窗口
 
   // Wire up modules
   syncEngine.setMainWindow(mainWindow);
@@ -91,6 +95,10 @@ ipcMain.handle('sync:status', (_, gameId) => {
   return g ? { status: g.syncStatus, lastSync: g.lastSyncTime } : null;
 });
 
+// Sync History
+ipcMain.handle('history:list', () => configStore.getSyncHistory());
+ipcMain.handle('history:clear', () => { configStore.clearSyncHistory(); return { status: 'ok' }; });
+
 // Versions
 ipcMain.handle('versions:list', (_, gameId) => syncEngine.getVersions(gameId));
 ipcMain.handle('versions:restore', (_, gid, vid) => syncEngine.restoreVersion(gid, vid));
@@ -140,11 +148,14 @@ if (!gotTheLock) {
     configStore.initPaths();
     configStore.load();
     createWindow();
+    // Start HTTP dev server for browser access
+    devServer.start(3000);
   });
 
   app.on('window-all-closed', () => {
     fileWatcher.stopAll();
     trayManager.destroy();
+    devServer.stop();
     app.quit();
   });
 

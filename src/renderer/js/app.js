@@ -60,30 +60,87 @@ async function loadTargets() {
 // ---- Recent Sync Page ----
 async function loadRecent() {
   const container = document.getElementById('recent-list');
-  const games = await window.api.getGames();
-  const synced = games
-    .filter(g => g.lastSyncTime)
-    .sort((a, b) => new Date(b.lastSyncTime) - new Date(a.lastSyncTime))
-    .slice(0, 20);
+  try {
+    const history = await window.api.getSyncHistory();
 
-  if (synced.length === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚡</div><div class="empty-title">暂无同步记录</div><div class="empty-desc">同步游戏存档后会在此显示</div></div>`;
-    return;
+    if (!history || history.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚡</div><div class="empty-title">暂无同步记录</div><div class="empty-desc">同步游戏存档后会在此显示完整的同步时间线</div></div>`;
+      return;
+    }
+
+    // Group by date
+    const groups = {};
+    history.forEach(entry => {
+      const date = new Date(entry.timestamp);
+      const key = date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(entry);
+    });
+
+    let html = '<div class="sync-timeline">';
+    for (const [dateLabel, entries] of Object.entries(groups)) {
+      html += `<div class="timeline-date-group">`;
+      html += `<div class="timeline-date-label">${dateLabel}</div>`;
+      html += `<div class="timeline-entries">`;
+      entries.forEach(entry => {
+        const dirInfo = formatDirection(entry.direction);
+        const statusInfo = formatHistoryStatus(entry.status);
+        const time = new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const targetLabel = entry.targetName ? `<span class="history-target">${entry.targetType === 'webdav' ? '🌐' : '📁'} ${entry.targetName}</span>` : '';
+        const errorMsg = entry.errorMessage ? `<div class="history-error">❌ ${entry.errorMessage}</div>` : '';
+
+        html += `
+          <div class="timeline-entry animate-fade-in ${statusInfo.entryClass}">
+            <div class="timeline-dot ${dirInfo.dotClass}"></div>
+            <div class="timeline-connector"></div>
+            <div class="timeline-content">
+              <div class="timeline-header">
+                <div class="timeline-game">
+                  <span class="timeline-game-icon">${entry.gameIcon || '🎮'}</span>
+                  <span class="timeline-game-name">${entry.gameName}</span>
+                </div>
+                <span class="timeline-time">${time}</span>
+              </div>
+              <div class="timeline-details">
+                <span class="timeline-direction ${dirInfo.class}">
+                  <span class="direction-arrow">${dirInfo.arrow}</span>
+                  ${dirInfo.label}
+                </span>
+                <span class="timeline-status ${statusInfo.class}">${statusInfo.icon} ${statusInfo.label}</span>
+                ${targetLabel}
+              </div>
+              ${errorMsg}
+            </div>
+          </div>
+        `;
+      });
+      html += `</div></div>`;
+    }
+    html += '</div>';
+    container.innerHTML = html;
+  } catch (e) {
+    console.error('Failed to load sync history:', e);
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">加载失败</div><div class="empty-desc">${e.message}</div></div>`;
   }
+}
 
-  container.innerHTML = synced.map(g => {
-    const status = ui.formatSyncStatus(g.syncStatus || 'idle');
-    return `
-      <div class="target-card animate-fade-in">
-        <div class="target-icon">${g.icon || '🎮'}</div>
-        <div class="target-info">
-          <div class="target-name">${g.name}</div>
-          <div class="target-path">同步于 ${new Date(g.lastSyncTime).toLocaleString('zh-CN')}</div>
-        </div>
-        <span class="game-status ${status.class}">${status.icon} ${status.label}</span>
-      </div>
-    `;
-  }).join('');
+function formatDirection(direction) {
+  const map = {
+    'upload':   { label: '上传', arrow: '↑', class: 'dir-upload',   dotClass: 'dot-upload' },
+    'download': { label: '下载', arrow: '↓', class: 'dir-download', dotClass: 'dot-download' },
+    'conflict': { label: '冲突', arrow: '⇄', class: 'dir-conflict', dotClass: 'dot-conflict' },
+    'unknown':  { label: '未知', arrow: '?', class: 'dir-unknown',  dotClass: 'dot-unknown' }
+  };
+  return map[direction] || map['unknown'];
+}
+
+function formatHistoryStatus(status) {
+  const map = {
+    'success':  { label: '成功', icon: '✅', class: 'hs-success',  entryClass: 'entry-success' },
+    'error':    { label: '失败', icon: '❌', class: 'hs-error',    entryClass: 'entry-error' },
+    'conflict': { label: '冲突', icon: '⚠️', class: 'hs-conflict', entryClass: 'entry-conflict' }
+  };
+  return map[status] || { label: status, icon: '❓', class: '', entryClass: '' };
 }
 
 // ---- Settings ----
@@ -139,6 +196,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Add target buttons
   document.getElementById('btn-add-target').addEventListener('click', () => dialogs.openAddTarget());
   document.getElementById('btn-add-target-empty')?.addEventListener('click', () => dialogs.openAddTarget());
+
+  // Clear sync history
+  document.getElementById('btn-clear-history').addEventListener('click', async () => {
+    const ok = await ui.confirm('确定要清空所有同步记录吗？此操作不可恢复。');
+    if (!ok) return;
+    await window.api.clearSyncHistory();
+    ui.toast('同步记录已清空', 'success');
+    loadRecent();
+  });
 
   // Sync all
   document.getElementById('btn-sync-all').addEventListener('click', async () => {

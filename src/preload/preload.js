@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld('api', {
   compareGame: (gameId) => ipcRenderer.invoke('sync:compare', gameId),
   getSyncStatus: (gameId) => ipcRenderer.invoke('sync:status', gameId),
 
+  // ---- Sync History ----
+  getSyncHistory: () => ipcRenderer.invoke('history:list'),
+  clearSyncHistory: () => ipcRenderer.invoke('history:clear'),
+
   // ---- Version Management ----
   getVersions: (gameId) => ipcRenderer.invoke('versions:list', gameId),
   restoreVersion: (gameId, versionId) => ipcRenderer.invoke('versions:restore', gameId, versionId),

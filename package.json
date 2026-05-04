@@ -5,6 +5,7 @@
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
+    "dev": "electron . --remote-debugging-port=9222",
     "package": "electron-packager . GameSync --platform=win32 --arch=x64 --out=dist --overwrite --icon=src/renderer/assets/icon.ico --asar",
     "package:arm64": "electron-packager . GameSync --platform=win32 --arch=arm64 --out=dist --overwrite --icon=src/renderer/assets/icon.ico --asar",
     "build": "electron-builder --win",

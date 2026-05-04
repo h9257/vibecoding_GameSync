@@ -328,3 +328,160 @@
 .tab.active {
   background: var(--accent-gradient); color: white;
 }
+
+/* ====== Sync History Timeline ====== */
+.sync-timeline {
+  display: flex; flex-direction: column; gap: 24px;
+}
+
+.timeline-date-group {
+  display: flex; flex-direction: column; gap: 0;
+}
+
+.timeline-date-label {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 6px 12px; margin-bottom: 10px;
+  background: var(--bg-tertiary); border-radius: var(--radius-sm);
+  display: inline-block; width: fit-content;
+  border: 1px solid var(--border);
+}
+
+.timeline-entries {
+  display: flex; flex-direction: column; gap: 0;
+  padding-left: 8px;
+}
+
+.timeline-entry {
+  display: flex; align-items: stretch; gap: 16px;
+  position: relative;
+  padding: 0 0 0 0;
+  min-height: 64px;
+}
+
+.timeline-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 16px;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
+  background: var(--accent-primary);
+}
+.dot-upload { background: #10b981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+.dot-download { background: #3b82f6; box-shadow: 0 0 8px rgba(59, 130, 246, 0.4); }
+.dot-conflict { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+.dot-unknown { background: var(--text-muted); box-shadow: none; }
+
+.timeline-connector {
+  position: absolute;
+  left: 5px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline-entry:last-child .timeline-connector {
+  display: none;
+}
+
+.timeline-content {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  transition: all var(--transition-normal);
+  backdrop-filter: blur(10px);
+}
+.timeline-content:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.entry-error .timeline-content {
+  border-left: 3px solid var(--danger);
+}
+.entry-conflict .timeline-content {
+  border-left: 3px solid var(--warning);
+}
+.entry-success .timeline-content {
+  border-left: 3px solid var(--success);
+}
+
+.timeline-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.timeline-game {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.timeline-game-icon {
+  font-size: 20px; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+}
+
+.timeline-game-name {
+  font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+
+.timeline-time {
+  font-size: 11px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-details {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+.timeline-direction {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600;
+  padding: 3px 10px; border-radius: 20px;
+}
+.dir-upload {
+  background: rgba(16, 185, 129, 0.12); color: #10b981;
+}
+.dir-download {
+  background: rgba(59, 130, 246, 0.12); color: #3b82f6;
+}
+.dir-conflict {
+  background: rgba(245, 158, 11, 0.12); color: #f59e0b;
+}
+.dir-unknown {
+  background: var(--glass-bg); color: var(--text-muted);
+}
+
+.direction-arrow {
+  font-size: 14px; font-weight: 800;
+  line-height: 1;
+}
+
+.timeline-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 500;
+  padding: 2px 8px; border-radius: 10px;
+}
+.hs-success { background: var(--success-bg); color: var(--success); }
+.hs-error { background: var(--danger-bg); color: var(--danger); }
+.hs-conflict { background: var(--warning-bg); color: var(--warning); }
+
+.history-target {
+  font-size: 11px; color: var(--text-muted);
+  background: var(--glass-bg); padding: 2px 8px;
+  border-radius: 10px; border: 1px solid var(--glass-border);
+}
+
+.history-error {
+  margin-top: 8px;
+  font-size: 11px; color: var(--danger);
+  background: var(--danger-bg);
+  padding: 6px 10px; border-radius: var(--radius-sm);
+  word-break: break-all;
+}

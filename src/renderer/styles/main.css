@@ -77,6 +77,19 @@ body {
   z-index: 1000;
 }
 
+/* Prevent drag region from intercepting clicks on interactive elements */
+.main-content,
+.sidebar,
+.modal-overlay,
+.toast-container,
+input, select, textarea, button, a,
+.form-input, .form-select,
+.toggle, .tab,
+.game-card, .preset-item, .target-card,
+.nav-item, .emoji-option {
+  -webkit-app-region: no-drag;
+}
+
 .title-bar-left {
   display: flex;
   align-items: center;

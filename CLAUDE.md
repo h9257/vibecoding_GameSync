@@ -16,6 +16,7 @@ GameSync is a Windows-only Electron desktop app for synchronizing game save file
 ```bash
 npm install          # Install dependencies
 npm start            # Run in development (electron .)
+npm run dev          # Run with remote debugging port 9222
 npm run package      # Package x64 Windows executable via electron-packager → dist/
 npm run package:arm64 # Package ARM64 Windows executable
 npm run build        # Build NSIS installer via electron-builder
@@ -23,6 +24,10 @@ npm run pack         # Package to directory (no installer) via electron-builder
 ```
 
 No test framework or linter is configured.
+
+## Browser Debug Mode
+
+A dev HTTP server starts on port 3000 alongside Electron, allowing the UI to be accessed in a regular browser at `http://localhost:3000`. The renderer detects whether `window.api` was injected by the Electron preload; if not, `api-shim.js` provides a fetch-based implementation that proxies all calls to REST endpoints served by `dev-server.js`. This is useful for rapid UI iteration without restarting Electron.
 
 ## Architecture
 
@@ -36,6 +41,7 @@ Standard Electron three-process model with `contextIsolation: true`, `nodeIntegr
 - **game-database.js** — Hardcoded database of 24 preset games with Windows save paths using env var placeholders.
 - **file-watcher.js** — `chokidar` watcher on game save dirs, 5s debounce, triggers auto-sync.
 - **tray.js** — System tray icon and context menu.
+- **dev-server.js** — Embedded HTTP server (port 3000) exposing the same backend logic as REST API endpoints, plus static file serving for browser-based debug access.
 
 ### Preload (`src/preload/preload.js`)
 
@@ -43,6 +49,7 @@ Exposes `window.api` via `contextBridge` with ~25 methods covering all IPC chann
 
 ### Renderer (`src/renderer/`)
 
+- **js/api-shim.js** — Browser fallback: if `window.api` is absent (no Electron preload), provides a fetch-based `window.api` backed by the dev server's REST endpoints. Injected automatically by dev-server.js when serving index.html.
 - **app.js** — Init, page navigation, settings, IPC callback binding.
 - **game-list.js** — `GameList` class: loads/renders game cards with upload/download/sync/open actions.
 - **dialogs.js** — `Dialogs` class: Add Game (preset + custom tabs, emoji picker), Add Target (local + WebDAV), Game Detail modals.

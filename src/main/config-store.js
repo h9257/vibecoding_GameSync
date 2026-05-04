@@ -102,10 +102,12 @@ class ConfigStore {
     return {
       syncTargets: [],
       games: [],
+      syncHistory: [],
       settings: {
         autoSyncEnabled: false,
         autoSyncIntervalMinutes: 30,
         maxVersions: 10,
+        maxHistoryEntries: 100,
         minimizeToTray: true,
         startMinimized: false,
         language: 'zh-CN'
@@ -236,6 +238,40 @@ class ConfigStore {
     const settings = { ...this.getSettings(), ...updates };
     this.set('settings', settings);
     return settings;
+  }
+
+  // ---- Sync History ----
+
+  getSyncHistory() {
+    const history = this.get('syncHistory') || [];
+    return history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }
+
+  addSyncHistoryEntry(entry) {
+    const history = this.get('syncHistory') || [];
+    entry.id = this.generateId();
+    entry.timestamp = entry.timestamp || new Date().toISOString();
+    history.push(entry);
+
+    // Trim old entries
+    const max = this.getSettings().maxHistoryEntries || 100;
+    while (history.length > max) {
+      // Remove the oldest entry
+      let oldestIdx = 0;
+      let oldestTime = new Date(history[0].timestamp).getTime();
+      for (let i = 1; i < history.length; i++) {
+        const t = new Date(history[i].timestamp).getTime();
+        if (t < oldestTime) { oldestTime = t; oldestIdx = i; }
+      }
+      history.splice(oldestIdx, 1);
+    }
+
+    this.set('syncHistory', history);
+    return entry;
+  }
+
+  clearSyncHistory() {
+    this.set('syncHistory', []);
   }
 
   // ---- Versions ----
