@@ -1,0 +1,140 @@
+/* ====== Keyframe Animations ====== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(124, 58, 237, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.4); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0); opacity: 0.6; }
+  100% { transform: scale(4); opacity: 0; }
+}
+
+@keyframes statusPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 500px; }
+}
+
+@keyframes progressBar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ====== Animation Utility Classes ====== */
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-fade-scale {
+  animation: fadeInScale 0.3s ease forwards;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease infinite;
+}
+
+.animate-glow {
+  animation: glowPulse 2s ease infinite;
+}
+
+/* Staggered card animations */
+.game-card:nth-child(1) { animation-delay: 0ms; }
+.game-card:nth-child(2) { animation-delay: 50ms; }
+.game-card:nth-child(3) { animation-delay: 100ms; }
+.game-card:nth-child(4) { animation-delay: 150ms; }
+.game-card:nth-child(5) { animation-delay: 200ms; }
+.game-card:nth-child(6) { animation-delay: 250ms; }
+.game-card:nth-child(7) { animation-delay: 300ms; }
+.game-card:nth-child(8) { animation-delay: 350ms; }
+.game-card:nth-child(9) { animation-delay: 400ms; }
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Syncing animation */
+.syncing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.syncing-indicator .sync-icon {
+  animation: spin 1.2s linear infinite;
+  display: inline-block;
+}
+
+/* Progress bar animation */
+.progress-bar-animated .progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: progressBar 1.5s ease infinite;
+}
+
+/* Toast notification animation */
+.toast {
+  animation: slideInRight 0.3s ease forwards;
+}
+.toast.leaving {
+  animation: slideInRight 0.3s ease reverse forwards;
+}
+
+/* Modal animation */
+.modal-overlay.visible { animation: fadeIn 0.2s ease forwards; }
+.modal-overlay.visible .modal-content { animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
