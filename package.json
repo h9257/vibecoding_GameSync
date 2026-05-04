@@ -1,6 +1,6 @@
 {
   "name": "gamesync",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Windows 游戏存档同步器 - Game Save Synchronizer",
   "main": "src/main/main.js",
   "scripts": {

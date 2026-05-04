@@ -54,6 +54,9 @@ contextBridge.exposeInMainWorld('api', {
   // ---- File Watcher ----
   toggleAutoSync: (gameId, enabled) => ipcRenderer.invoke('watcher:toggle', gameId, enabled),
 
+  // ---- File Scanning ----
+  scanFiles: (gameId) => ipcRenderer.invoke('files:scan', gameId),
+
   // ---- Events from Main Process ----
   onSyncProgress: (callback) => {
     const handler = (_event, data) => callback(data);

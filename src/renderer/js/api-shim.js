@@ -85,6 +85,9 @@
     // ---- File Watcher ----
     toggleAutoSync: (gameId, enabled) => apiCall('/watcher/toggle', { gameId, enabled }),
 
+    // ---- File Scanning ----
+    scanFiles: (gameId) => apiCall(`/files/scan/${gameId}`),
+
     // ---- Events (polling-based in browser) ----
     onSyncProgress: (callback) => { window._syncProgressCb = callback; return () => {}; },
     onSyncComplete: (callback) => { window._syncCompleteCb = callback; return () => {}; },

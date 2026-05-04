@@ -13,6 +13,102 @@ class SyncEngine {
 
   setMainWindow(win) { this.mainWindow = win; }
 
+  // ---- File Filtering ----
+
+  /**
+   * Check if a relative file path should be excluded based on glob patterns.
+   * Supported patterns: * (any non-slash), ** (any including slash), ? (single char), exact names
+   */
+  shouldExclude(relPath, excludePatterns) {
+    if (!excludePatterns || excludePatterns.length === 0) return false;
+    // Normalize to forward slashes
+    const normalized = relPath.replace(/\\/g, '/');
+    for (const pattern of excludePatterns) {
+      if (this._globMatch(normalized, pattern.replace(/\\/g, '/'))) return true;
+    }
+    return false;
+  }
+
+  _globMatch(str, pattern) {
+    // Convert glob to regex
+    let regexStr = '^';
+    let i = 0;
+    while (i < pattern.length) {
+      const c = pattern[i];
+      if (c === '*') {
+        if (pattern[i + 1] === '*') {
+          // ** matches anything including /
+          if (pattern[i + 2] === '/') {
+            regexStr += '(?:.*/)?';
+            i += 3;
+          } else {
+            regexStr += '.*';
+            i += 2;
+          }
+        } else {
+          // * matches anything except /
+          regexStr += '[^/]*';
+          i++;
+        }
+      } else if (c === '?') {
+        regexStr += '[^/]';
+        i++;
+      } else if (c === '.') {
+        regexStr += '\\.';
+        i++;
+      } else {
+        regexStr += c;
+        i++;
+      }
+    }
+    regexStr += '$';
+    try {
+      return new RegExp(regexStr, 'i').test(str);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Scan a directory and return a file tree structure for the UI.
+   * Each node: { name, path, type: 'file'|'dir', size?, children?, excluded? }
+   */
+  scanDirectory(dirPath, excludePatterns = [], basePath = null) {
+    if (!basePath) basePath = dirPath;
+    if (!fs.existsSync(dirPath)) return [];
+    const result = [];
+    try {
+      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+        const fullPath = path.join(dirPath, entry.name);
+        const relPath = path.relative(basePath, fullPath);
+        const excluded = this.shouldExclude(relPath, excludePatterns);
+
+        if (entry.isDirectory()) {
+          const children = this.scanDirectory(fullPath, excludePatterns, basePath);
+          result.push({
+            name: entry.name,
+            relPath,
+            type: 'dir',
+            excluded,
+            children
+          });
+        } else {
+          let size = 0;
+          try { size = fs.statSync(fullPath).size; } catch {}
+          result.push({
+            name: entry.name,
+            relPath,
+            type: 'file',
+            size,
+            sizeFormatted: this.formatSize(size),
+            excluded
+          });
+        }
+      }
+    } catch {}
+    return result;
+  }
+
   sendProgress(data) {
     if (this.mainWindow && !this.mainWindow.isDestroyed())
       this.mainWindow.webContents.send('sync:progress', data);
@@ -133,13 +229,14 @@ class SyncEngine {
   }
 
   async uploadSave(game, target) {
+    const excludes = game.excludePatterns || [];
     if (game.packMode) {
-      await this.packAndUpload(game, target);
+      await this.packAndUpload(game, target, excludes);
     } else {
       this.sendProgress({ gameId: game.id, status: 'uploading', message: '正在上传...' });
       const remotePath = this.getRemotePath(game, target);
-      if (target.type === 'local') await this.copyDirectory(game.localPath, remotePath);
-      else if (target.type === 'webdav') await this.webdavUploadDir(game.localPath, remotePath, target);
+      if (target.type === 'local') await this.copyDirectory(game.localPath, remotePath, excludes);
+      else if (target.type === 'webdav') await this.webdavUploadDir(game.localPath, remotePath, target, excludes);
     }
   }
 
@@ -156,14 +253,18 @@ class SyncEngine {
 
   // ---- Pack (Zip) Mode ----
 
-  async packAndUpload(game, target) {
+  async packAndUpload(game, target, excludePatterns = []) {
     this.sendProgress({ gameId: game.id, status: 'uploading', message: '正在打包压缩...' });
 
     if (!fs.existsSync(game.localPath)) throw new Error(`源路径不存在: ${game.localPath}`);
 
-    // Create zip in temp location
+    // Create zip with filtering
     const zip = new AdmZip();
-    zip.addLocalFolder(game.localPath);
+    if (excludePatterns.length > 0) {
+      this._addFolderToZipFiltered(zip, game.localPath, game.localPath, excludePatterns);
+    } else {
+      zip.addLocalFolder(game.localPath);
+    }
     const zipBuffer = zip.toBuffer();
     const zipFileName = this.sanitizeName(game.name) + '.zip';
 
@@ -317,13 +418,33 @@ class SyncEngine {
 
   sanitizeName(n) { return n.replace(/[<>:"/\\|?*]/g, '_').trim(); }
 
-  async copyDirectory(src, dest) {
+  async copyDirectory(src, dest, excludePatterns = [], basePath = null) {
+    if (!basePath) basePath = src;
     if (!fs.existsSync(src)) throw new Error(`源路径不存在: ${src}`);
     fs.mkdirSync(dest, { recursive: true });
     for (const e of fs.readdirSync(src, { withFileTypes: true })) {
       const s = path.join(src, e.name), d = path.join(dest, e.name);
-      if (e.isDirectory()) await this.copyDirectory(s, d);
+      const relPath = path.relative(basePath, s);
+      if (this.shouldExclude(relPath, excludePatterns)) continue;
+      if (e.isDirectory()) await this.copyDirectory(s, d, excludePatterns, basePath);
       else fs.copyFileSync(s, d);
+    }
+  }
+
+  /**
+   * Add folder contents to zip with exclude filtering.
+   */
+  _addFolderToZipFiltered(zip, dirPath, basePath, excludePatterns, zipDir = '') {
+    for (const e of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      const fullPath = path.join(dirPath, e.name);
+      const relPath = path.relative(basePath, fullPath);
+      if (this.shouldExclude(relPath, excludePatterns)) continue;
+      const zipPath = zipDir ? zipDir + '/' + e.name : e.name;
+      if (e.isDirectory()) {
+        this._addFolderToZipFiltered(zip, fullPath, basePath, excludePatterns, zipPath);
+      } else {
+        zip.addLocalFile(fullPath, zipDir || undefined);
+      }
     }
   }
 
@@ -369,14 +490,17 @@ class SyncEngine {
     return r.status < 400 || r.status === 405;
   }
 
-  async webdavUploadDir(localDir, remotePath, target) {
+  async webdavUploadDir(localDir, remotePath, target, excludePatterns = [], basePath = null) {
+    if (!basePath) basePath = localDir;
     const base = target.url.replace(/\/+$/, '');
     const parts = remotePath.split('/').filter(Boolean);
     let cp = '';
     for (const p of parts) { cp += '/' + p; await this.webdavEnsureDir(`${base}${cp}`, target); }
     for (const e of fs.readdirSync(localDir, { withFileTypes: true })) {
       const lp = path.join(localDir, e.name);
-      if (e.isDirectory()) await this.webdavUploadDir(lp, `${remotePath}/${e.name}`, target);
+      const relPath = path.relative(basePath, lp);
+      if (this.shouldExclude(relPath, excludePatterns)) continue;
+      if (e.isDirectory()) await this.webdavUploadDir(lp, `${remotePath}/${e.name}`, target, excludePatterns, basePath);
       else {
         const data = fs.readFileSync(lp);
         await this._webdavReq('PUT', `${base}${remotePath}/${e.name}`, target, { headers: { 'Content-Type': 'application/octet-stream' }, body: data });

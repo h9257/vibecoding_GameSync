@@ -128,6 +128,13 @@ ipcMain.handle('watcher:toggle', (_, gameId, enabled) => {
   fileWatcher.toggleWatch(gameId, enabled);
 });
 
+// File scanning for filter UI
+ipcMain.handle('files:scan', (_, gameId) => {
+  const game = configStore.getGame(gameId);
+  if (!game) throw new Error('游戏不存在');
+  return syncEngine.scanDirectory(game.localPath, game.excludePatterns || []);
+});
+
 // ---- App Lifecycle ----
 
 const gotTheLock = app.requestSingleInstanceLock();

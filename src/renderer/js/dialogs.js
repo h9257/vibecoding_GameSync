@@ -3,7 +3,6 @@
  */
 class Dialogs {
   constructor() {
-    this.selectedPreset = null;
     this.currentDetailGameId = null;
   }
 
@@ -27,19 +26,10 @@ class Dialogs {
 
   // ==== Add Game Dialog ====
   initAddGameDialog() {
-    ui.initTabs('add-game-tabs', (tab) => {
-      document.getElementById('tab-preset').style.display = tab === 'preset' ? 'block' : 'none';
-      document.getElementById('tab-custom').style.display = tab === 'custom' ? 'block' : 'none';
-    });
-
     document.getElementById('btn-confirm-add-game').addEventListener('click', () => this.confirmAddGame());
     document.getElementById('btn-browse-path').addEventListener('click', async () => {
       const p = await window.api.selectFolder('选择存档文件夹');
       if (p) document.getElementById('custom-game-path').value = p;
-    });
-
-    document.getElementById('preset-search-input').addEventListener('input', (e) => {
-      this.filterPresets(e.target.value);
     });
 
     // Emoji Picker Logic
@@ -84,37 +74,24 @@ class Dialogs {
 
   async openAddGame(editGameId = null) {
     this.editingGameId = editGameId;
-    this.selectedPreset = null;
-    document.getElementById('preset-search-input').value = '';
     document.getElementById('custom-game-name').value = '';
     document.getElementById('custom-game-path').value = '';
     document.getElementById('custom-game-icon').value = '🎮';
     document.getElementById('custom-game-icon-btn').textContent = '🎮';
     document.getElementById('emoji-picker-dropdown').style.display = 'none';
-    
-    const tp = document.getElementById('toggle-preset-pack');
+
     const tc = document.getElementById('toggle-custom-pack');
-    if (tp) tp.classList.remove('active');
     if (tc) tc.classList.remove('active');
-    
-    // Bind toggle clicks
-    if (tp) tp.onclick = () => tp.classList.toggle('active');
     if (tc) tc.onclick = () => tc.classList.toggle('active');
 
     const titleEl = document.getElementById('add-game-modal-title');
     const btnEl = document.getElementById('btn-confirm-add-game');
-    const tabsEl = document.getElementById('add-game-tabs');
 
     if (editGameId) {
       const game = gameList.getGame(editGameId);
       if (game) {
         titleEl.textContent = '编辑游戏';
         btnEl.textContent = '保存';
-        tabsEl.style.display = 'none'; // Hide tabs when editing
-        
-        // Force switch to custom tab
-        document.querySelector('#add-game-tabs .tab[data-tab="custom"]').click();
-        
         document.getElementById('custom-game-name').value = game.name || '';
         document.getElementById('custom-game-path').value = game.localPath || '';
         document.getElementById('custom-game-icon').value = game.icon || '🎮';
@@ -124,88 +101,26 @@ class Dialogs {
     } else {
       titleEl.textContent = '添加游戏';
       btnEl.textContent = '添加';
-      tabsEl.style.display = 'flex';
-      // Default to preset tab
-      document.querySelector('#add-game-tabs .tab[data-tab="preset"]').click();
     }
 
-    await this.loadPresets();
     ui.openModal('modal-add-game');
   }
 
-  async loadPresets() {
-    try {
-      const presets = await window.api.getPresetGames();
-      this.renderPresets(presets);
-    } catch (e) {
-      console.error('Failed to load presets:', e);
-    }
-  }
-
-  renderPresets(presets) {
-    const list = document.getElementById('preset-list');
-    list.innerHTML = presets.map(p => {
-      const fs = require ? '' : '';
-      return `
-        <div class="preset-item" data-key="${p.key}">
-          <span class="preset-icon">${p.icon}</span>
-          <span class="preset-name">${p.name}</span>
-          <span class="preset-category">${p.category}</span>
-        </div>
-      `;
-    }).join('');
-
-    list.querySelectorAll('.preset-item').forEach(item => {
-      item.addEventListener('click', () => {
-        list.querySelectorAll('.preset-item').forEach(i => i.classList.remove('selected'));
-        item.classList.add('selected');
-        this.selectedPreset = presets.find(p => p.key === item.dataset.key);
-      });
-    });
-  }
-
-  async filterPresets(query) {
-    try {
-      const results = query ? await window.api.searchPresetGames(query) : await window.api.getPresetGames();
-      this.renderPresets(results);
-    } catch (e) {
-      console.error('Search error:', e);
-    }
-  }
-
   async confirmAddGame() {
-    const activeTab = document.querySelector('#add-game-tabs .tab.active').dataset.tab;
-
-    let game;
-    if (activeTab === 'preset' && this.selectedPreset) {
-      const packMode = document.getElementById('toggle-preset-pack')?.classList.contains('active') || false;
-      game = {
-        name: this.selectedPreset.name,
-        localPath: this.selectedPreset.resolvedPath,
-        icon: this.selectedPreset.icon,
-        autoSync: false,
-        packMode
-      };
-    } else if (activeTab === 'custom') {
-      const name = document.getElementById('custom-game-name').value.trim();
-      const pathVal = document.getElementById('custom-game-path').value.trim();
-      const icon = document.getElementById('custom-game-icon').value.trim() || '🎮';
-      const packMode = document.getElementById('toggle-custom-pack')?.classList.contains('active') || false;
-      if (!name) { ui.toast('请输入游戏名称', 'warning'); return; }
-      if (!pathVal) { ui.toast('请选择存档路径', 'warning'); return; }
-      game = { name, localPath: pathVal, icon, autoSync: false, packMode };
-    } else {
-      ui.toast('请选择一个游戏或自定义添加', 'warning');
-      return;
-    }
+    const name = document.getElementById('custom-game-name').value.trim();
+    const pathVal = document.getElementById('custom-game-path').value.trim();
+    const icon = document.getElementById('custom-game-icon').value.trim() || '🎮';
+    const packMode = document.getElementById('toggle-custom-pack')?.classList.contains('active') || false;
+    if (!name) { ui.toast('请输入游戏名称', 'warning'); return; }
+    if (!pathVal) { ui.toast('请选择存档路径', 'warning'); return; }
+    const game = { name, localPath: pathVal, icon, autoSync: false, packMode };
 
     try {
       if (this.editingGameId) {
         await window.api.updateGame(this.editingGameId, game);
         ui.closeModal('modal-add-game');
         ui.toast(`已保存: ${game.name}`, 'success');
-        
-        // Update detail view if it's currently open
+
         if (this.currentDetailGameId === this.editingGameId) {
           this.openGameDetail(this.editingGameId);
         }
@@ -310,7 +225,9 @@ class Dialogs {
     ui.initTabs('detail-tabs', (tab) => {
       document.getElementById('tab-detail-info').style.display = tab === 'detail-info' ? 'block' : 'none';
       document.getElementById('tab-detail-versions').style.display = tab === 'detail-versions' ? 'block' : 'none';
+      document.getElementById('tab-detail-filter').style.display = tab === 'detail-filter' ? 'block' : 'none';
       if (tab === 'detail-versions') this.loadVersions();
+      if (tab === 'detail-filter') this.loadFilterTab();
     });
 
     document.getElementById('btn-delete-game').addEventListener('click', () => this.deleteCurrentGame());
@@ -435,6 +352,7 @@ class Dialogs {
     document.querySelector('#detail-tabs .tab[data-tab="detail-info"]').classList.add('active');
     document.getElementById('tab-detail-info').style.display = 'block';
     document.getElementById('tab-detail-versions').style.display = 'none';
+    document.getElementById('tab-detail-filter').style.display = 'none';
 
     ui.openModal('modal-game-detail');
   }
@@ -500,6 +418,166 @@ class Dialogs {
     } catch (e) {
       ui.toast(`删除失败: ${e.message}`, 'error');
     }
+  }
+
+  // ==== Sync Filter Tab ====
+
+  async loadFilterTab() {
+    if (!this.currentDetailGameId) return;
+    const game = gameList.getGame(this.currentDetailGameId);
+    if (!game) return;
+
+    // Populate exclude patterns textarea
+    const textarea = document.getElementById('filter-patterns-input');
+    textarea.value = (game.excludePatterns || []).join('\n');
+
+    // Save button
+    document.getElementById('btn-save-filters').onclick = () => this.saveFilters();
+
+    // Refresh tree button
+    document.getElementById('btn-refresh-tree').onclick = () => this.loadFileTree();
+
+    // Presets dropdown
+    document.getElementById('btn-filter-presets').onclick = () => this.showFilterPresets();
+
+    // Auto-load file tree
+    this.loadFileTree();
+  }
+
+  async saveFilters() {
+    if (!this.currentDetailGameId) return;
+    const textarea = document.getElementById('filter-patterns-input');
+    const patterns = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    try {
+      await window.api.updateGame(this.currentDetailGameId, { excludePatterns: patterns });
+      await gameList.load();
+      document.getElementById('filter-save-status').textContent = '✅ 已保存';
+      setTimeout(() => { document.getElementById('filter-save-status').textContent = ''; }, 2000);
+      // Refresh tree to show updated exclusions
+      this.loadFileTree();
+    } catch (e) {
+      document.getElementById('filter-save-status').textContent = `❌ ${e.message}`;
+    }
+  }
+
+  showFilterPresets() {
+    const presets = [
+      { name: '日志文件', patterns: ['*.log', '*.log.*'] },
+      { name: '临时文件', patterns: ['*.tmp', '*.temp', '~*'] },
+      { name: '缓存目录', patterns: ['cache/**', 'Cache/**', '__pycache__/**'] },
+      { name: 'Windows 系统', patterns: ['Thumbs.db', 'desktop.ini', '*.lnk'] },
+      { name: '编译产物', patterns: ['*.o', '*.obj', '*.exe', '*.dll'] },
+      { name: 'Git 目录', patterns: ['.git/**', '.gitignore'] }
+    ];
+
+    const textarea = document.getElementById('filter-patterns-input');
+    const current = textarea.value.trim();
+    const items = presets.map(p =>
+      `• ${p.name}: ${p.patterns.join(', ')}`
+    ).join('\n');
+
+    const choice = prompt(
+      `选择要添加的模板（输入序号）:\n\n` +
+      presets.map((p, i) => `${i + 1}. ${p.name} — ${p.patterns.join(', ')}`).join('\n')
+    );
+
+    if (choice) {
+      const idx = parseInt(choice) - 1;
+      if (idx >= 0 && idx < presets.length) {
+        const newPatterns = presets[idx].patterns.join('\n');
+        textarea.value = current ? current + '\n' + newPatterns : newPatterns;
+        ui.toast(`已添加「${presets[idx].name}」模板`, 'info', 2000);
+      }
+    }
+  }
+
+  async loadFileTree() {
+    if (!this.currentDetailGameId) return;
+    const container = document.getElementById('filter-file-tree');
+    container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center">正在扫描...</div>';
+
+    try {
+      const tree = await window.api.scanFiles(this.currentDetailGameId);
+      if (!tree || tree.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center">存档文件夹为空或不存在</div>';
+        return;
+      }
+      container.innerHTML = this.renderFileTree(tree);
+
+      // Event delegation for tree folder toggle
+      container.addEventListener('click', (e) => {
+        const toggle = e.target.closest('.tree-toggle');
+        if (!toggle) {
+          // Also toggle when clicking the dir row itself
+          const dirNode = e.target.closest('.tree-dir');
+          if (!dirNode) return;
+          const children = dirNode.nextElementSibling;
+          if (children && children.classList.contains('tree-children')) {
+            const isOpen = children.style.display !== 'none';
+            children.style.display = isOpen ? 'none' : 'block';
+            const arrow = dirNode.querySelector('.tree-toggle');
+            if (arrow) arrow.textContent = isOpen ? '▶' : '▼';
+          }
+          return;
+        }
+        const dirNode = toggle.closest('.tree-dir');
+        if (!dirNode) return;
+        const children = dirNode.nextElementSibling;
+        if (children && children.classList.contains('tree-children')) {
+          const isOpen = children.style.display !== 'none';
+          children.style.display = isOpen ? 'none' : 'block';
+          toggle.textContent = isOpen ? '▶' : '▼';
+        }
+      });
+    } catch (e) {
+      container.innerHTML = `<div style="color:var(--danger);font-size:13px;padding:20px">扫描失败: ${e.message}</div>`;
+    }
+  }
+
+  renderFileTree(nodes, depth = 0) {
+    let html = '';
+    // Sort: dirs first, then files
+    const sorted = [...nodes].sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    for (const node of sorted) {
+      const indent = depth * 18;
+      const excludedClass = node.excluded ? 'tree-excluded' : '';
+
+      if (node.type === 'dir') {
+        const childCount = this._countNodes(node.children);
+        html += `<div class="tree-node tree-dir ${excludedClass}" style="padding-left:${indent}px">`;
+        html += `<span class="tree-toggle">▶</span>`;
+        html += `<span class="tree-icon">📁</span>`;
+        html += `<span class="tree-name">${node.name}/</span>`;
+        html += `<span class="tree-meta">${childCount} 项</span>`;
+        if (node.excluded) html += `<span class="tree-badge-excluded">已排除</span>`;
+        html += `</div>`;
+        html += `<div class="tree-children" style="display:none">`;
+        html += this.renderFileTree(node.children || [], depth + 1);
+        html += `</div>`;
+      } else {
+        html += `<div class="tree-node tree-file ${excludedClass}" style="padding-left:${indent + 18}px">`;
+        html += `<span class="tree-icon">📄</span>`;
+        html += `<span class="tree-name">${node.name}</span>`;
+        html += `<span class="tree-meta">${node.sizeFormatted || ''}</span>`;
+        if (node.excluded) html += `<span class="tree-badge-excluded">已排除</span>`;
+        html += `</div>`;
+      }
+    }
+    return html;
+  }
+
+  _countNodes(children) {
+    if (!children) return 0;
+    let count = 0;
+    for (const c of children) {
+      count++;
+      if (c.children) count += this._countNodes(c.children);
+    }
+    return count;
   }
 }
 

@@ -91,6 +91,16 @@ function matchDynamicRoute(method, pathname) {
     const gameId = versionsMatch[1];
     return () => syncEngine.getVersions(gameId);
   }
+  // GET /api/files/scan/:gameId
+  const scanMatch = pathname.match(/^\/api\/files\/scan\/(.+)$/);
+  if (method === 'GET' && scanMatch) {
+    const gameId = scanMatch[1];
+    return () => {
+      const game = configStore.getGame(gameId);
+      if (!game) throw new Error('游戏不存在');
+      return syncEngine.scanDirectory(game.localPath, game.excludePatterns || []);
+    };
+  }
   return null;
 }
 

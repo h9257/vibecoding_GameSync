@@ -200,7 +200,7 @@
           <div class="settings-row">
             <div>
               <div class="settings-row-label">GameSync 游戏存档同步器</div>
-              <div class="settings-row-desc">版本 1.0.0 | 支持本地备份、云盘同步、WebDAV</div>
+              <div class="settings-row-desc">版本 1.0.1 | 支持本地备份、云盘同步、WebDAV</div>
             </div>
           </div>
         </div>
@@ -229,57 +229,33 @@
         <button class="modal-close" data-close-modal>&times;</button>
       </div>
       <div class="modal-body">
-        <div class="tabs" id="add-game-tabs">
-          <button class="tab active" data-tab="preset">预置游戏</button>
-          <button class="tab" data-tab="custom">自定义</button>
+        <div class="form-group">
+          <label class="form-label">游戏名称</label>
+          <input type="text" class="form-input" id="custom-game-name" placeholder="输入游戏名称">
         </div>
-
-        <!-- Preset Tab -->
-        <div id="tab-preset">
-          <div class="preset-search">
-            <span class="search-icon">🔍</span>
-            <input type="text" class="form-input" id="preset-search-input" placeholder="搜索游戏...">
-          </div>
-          <div class="preset-list" id="preset-list"></div>
-          <div class="form-group" style="margin-top:14px">
-            <div class="toggle" id="toggle-preset-pack">
-              <div class="toggle-track"></div>
-              <span class="toggle-label">📦 打包模式（压缩为 ZIP 后上传）</span>
-            </div>
-            <div class="form-hint">适合文件数量多的应用数据，减少传输时间和文件数量</div>
+        <div class="form-group">
+          <label class="form-label">存档路径</label>
+          <div class="form-input-group">
+            <input type="text" class="form-input" id="custom-game-path" placeholder="选择存档文件夹路径">
+            <button class="btn btn-secondary" id="btn-browse-path">浏览</button>
           </div>
         </div>
-
-        <!-- Custom Tab -->
-        <div id="tab-custom" style="display:none">
-          <div class="form-group">
-            <label class="form-label">游戏名称</label>
-            <input type="text" class="form-input" id="custom-game-name" placeholder="输入游戏名称">
-          </div>
-          <div class="form-group">
-            <label class="form-label">存档路径</label>
-            <div class="form-input-group">
-              <input type="text" class="form-input" id="custom-game-path" placeholder="选择存档文件夹路径">
-              <button class="btn btn-secondary" id="btn-browse-path">浏览</button>
+        <div class="form-group">
+          <label class="form-label">图标（Emoji）</label>
+          <div class="emoji-picker-container" style="position:relative">
+            <button class="btn btn-secondary emoji-picker-btn" id="custom-game-icon-btn" style="width:60px; font-size:20px; padding:4px">🎮</button>
+            <div class="emoji-picker-dropdown" id="emoji-picker-dropdown" style="display:none; position:absolute; top:100%; left:0; z-index:100; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; margin-top:4px; width:220px; max-height:180px; overflow-y:auto; box-shadow:var(--shadow-md); grid-template-columns:repeat(5, 1fr); gap:4px;">
+              <!-- Emojis will be injected here -->
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">图标（Emoji）</label>
-            <div class="emoji-picker-container" style="position:relative">
-              <button class="btn btn-secondary emoji-picker-btn" id="custom-game-icon-btn" style="width:60px; font-size:20px; padding:4px">🎮</button>
-              <div class="emoji-picker-dropdown" id="emoji-picker-dropdown" style="display:none; position:absolute; top:100%; left:0; z-index:100; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; margin-top:4px; width:220px; max-height:180px; overflow-y:auto; box-shadow:var(--shadow-md); grid-template-columns:repeat(5, 1fr); gap:4px;">
-                <!-- Emojis will be injected here -->
-              </div>
-            </div>
-            <input type="hidden" id="custom-game-icon" value="🎮">
+          <input type="hidden" id="custom-game-icon" value="🎮">
+        </div>
+        <div class="form-group">
+          <div class="toggle" id="toggle-custom-pack">
+            <div class="toggle-track"></div>
+            <span class="toggle-label">📦 打包模式（压缩为 ZIP 后上传）</span>
           </div>
-          <div class="form-group">
-            <div class="toggle" id="toggle-custom-pack">
-              <div class="toggle-track"></div>
-              <span class="toggle-label">📦 打包模式（压缩为 ZIP 后上传）</span>
-            </div>
-            <div class="form-hint">适合文件数量多的应用数据，减少传输时间和文件数量</div>
-          </div>
+          <div class="form-hint">适合文件数量多的应用数据，减少传输时间和文件数量</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -365,12 +341,40 @@
         <div class="tabs" id="detail-tabs">
           <button class="tab active" data-tab="detail-info">信息</button>
           <button class="tab" data-tab="detail-versions">版本历史</button>
+          <button class="tab" data-tab="detail-filter">同步过滤</button>
         </div>
         <div id="tab-detail-info">
           <div id="detail-info-content"></div>
         </div>
         <div id="tab-detail-versions" style="display:none">
           <div id="detail-versions-list"></div>
+        </div>
+        <div id="tab-detail-filter" style="display:none">
+          <div class="filter-section">
+            <div class="filter-header">
+              <div>
+                <div class="settings-row-label">排除规则</div>
+                <div class="settings-row-desc">使用 glob 模式排除不需要同步的文件（每行一条规则）</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-filter-presets">📋 常用模板</button>
+            </div>
+            <textarea class="form-input filter-textarea" id="filter-patterns-input" 
+              placeholder="输入排除规则，每行一条，例如：&#10;*.log&#10;*.tmp&#10;cache/**&#10;__pycache__/**"
+              rows="5"></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" id="btn-save-filters">💾 保存规则</button>
+              <span id="filter-save-status" style="font-size:12px;color:var(--text-muted);line-height:30px"></span>
+            </div>
+          </div>
+          <div class="filter-section" style="margin-top:16px">
+            <div class="filter-header">
+              <div class="settings-row-label">📁 文件预览</div>
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-tree">🔄 刷新</button>
+            </div>
+            <div id="filter-file-tree" class="file-tree-container">
+              <div style="color:var(--text-muted);font-size:13px;padding:20px;text-align:center">点击「刷新」扫描存档文件夹</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
