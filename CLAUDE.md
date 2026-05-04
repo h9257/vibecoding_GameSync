@@ -2,78 +2,56 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Git Config
-
-- **user.name:** hanmiao
-- **user.email:** hanmiao20@qq.com
-
 ## Project Overview
 
-GameSync is a Windows-only Electron desktop app for synchronizing game save files across devices. Supports local directory sync and WebDAV remote sync, with optional ZIP pack mode and automatic version backups. Built as a "Vibecoding" project (human-AI conversational collaboration).
+GameSync is an Electron desktop app for Windows that synchronizes game save files across devices. It supports local folder and WebDAV sync targets, with features like pack mode (ZIP compression), version history, auto-sync via file watching, and 25+ preset game save paths. UI is in Simplified Chinese.
 
-## Commands
+## Development Commands
 
 ```bash
-npm install          # Install dependencies
-npm start            # Run in development (electron .)
-npm run dev          # Run with remote debugging port 9222
-npm run package      # Package x64 Windows executable via electron-packager → dist/
-npm run package:arm64 # Package ARM64 Windows executable
-npm run build        # Build NSIS installer via electron-builder
-npm run pack         # Package to directory (no installer) via electron-builder
+npm start              # Run the Electron app
+npm run dev            # Run with remote debugging (port 9222)
+npm run package        # Package standalone x64 executable
+npm run package:arm64  # Package for ARM64
+npm run build          # Build NSIS installer (Windows)
+npm run pack           # Package to directory without installer
 ```
 
-No test framework or linter is configured.
-
-## Browser Debug Mode
-
-A dev HTTP server starts on port 3000 alongside Electron, allowing the UI to be accessed in a regular browser at `http://localhost:3000`. The renderer detects whether `window.api` was injected by the Electron preload; if not, `api-shim.js` provides a fetch-based implementation that proxies all calls to REST endpoints served by `dev-server.js`. This is useful for rapid UI iteration without restarting Electron.
+There are no tests or linting configured.
 
 ## Architecture
 
-Standard Electron three-process model with `contextIsolation: true`, `nodeIntegration: false`.
+### Process Model
 
-### Main Process (`src/main/`)
+- **Main process** (`src/main/`): Node.js backend with IPC handlers. All modules use singleton pattern (`module.exports = new ClassName()`).
+- **Preload** (`src/preload/preload.js`): contextBridge exposing `window.api` with ~30 methods.
+- **Renderer** (`src/renderer/`): Pure HTML/CSS/JS SPA with no framework. Four pages: Games, Recent Sync, Sync Targets, Settings.
 
-- **main.js** — Entry point. Creates BrowserWindow, registers ~30 IPC handlers, manages app lifecycle and single-instance lock.
-- **config-store.js** — JSON file-based config store (games, targets, settings, version history). Singleton. Supports data directory migration via `bootstrap.json` indirection.
-- **sync-engine.js** — Core sync logic: upload/download (local copy or WebDAV), pack/unpack ZIP mode, version backup/restore, conflict detection by timestamp comparison.
-- **game-database.js** — Hardcoded database of 24 preset games with Windows save paths using env var placeholders.
-- **file-watcher.js** — `chokidar` watcher on game save dirs, 5s debounce, triggers auto-sync.
-- **tray.js** — System tray icon and context menu.
-- **dev-server.js** — Embedded HTTP server (port 3000) exposing the same backend logic as REST API endpoints, plus static file serving for browser-based debug access.
+### Key Modules
 
-### Preload (`src/preload/preload.js`)
+- `sync-engine.js`: Core sync logic. Direction detection compares local/remote timestamps against `lastSyncTime` (2s tolerance). Supports file copy (local) and raw HTTP PUT/GET/PROPFIND (WebDAV). Pack mode compresses to ZIP via `adm-zip`.
+- `config-store.js`: JSON persistence at `%APPDATA%/gamesync/GameSync/config.json`. Handles games, targets, settings, history, versions.
+- `game-database.js`: Hardcoded 25 preset games with Windows save paths using env vars (`%APPDATA%`, `%LOCALAPPDATA%`, `%USERPROFILE%`).
+- `file-watcher.js`: chokidar-based auto-sync with 5-second debounce.
 
-Exposes `window.api` via `contextBridge` with ~25 methods covering all IPC channels plus event listeners for sync progress/completion/errors.
+### IPC Pattern
 
-### Renderer (`src/renderer/`)
+Request-response via `ipcMain.handle` / `ipcRenderer.invoke`. Push notifications from main to renderer use `webContents.send` for channels: `sync:progress`, `sync:complete`, `sync:error`, `watcher:change`, `sync:autoTriggered`.
 
-- **js/api-shim.js** — Browser fallback: if `window.api` is absent (no Electron preload), provides a fetch-based `window.api` backed by the dev server's REST endpoints. Injected automatically by dev-server.js when serving index.html.
-- **app.js** — Init, page navigation, settings, IPC callback binding.
-- **game-list.js** — `GameList` class: loads/renders game cards with upload/download/sync/open actions.
-- **dialogs.js** — `Dialogs` class: Add Game (preset + custom tabs, emoji picker), Add Target (local + WebDAV), Game Detail modals.
-- **ui-manager.js** — `UIManager` class: page switching, modals, toasts, tabs, toggles, status bar, formatting helpers.
+### File Filtering
 
-### Data Flow
+`sync-engine.js` contains a custom glob-to-regex engine supporting `*`, `**`, `?` patterns for excluding files from sync. The directory scanner produces a tree structure for the UI filter tab.
 
-```
-Renderer → window.api (preload) → ipcRenderer → ipcMain (main.js)
-                                                       ↓
-                                            config-store / sync-engine / file-watcher
-```
+## Key Dependencies
 
-### Sync Flow
+- `adm-zip`: ZIP operations for pack mode and version backups
+- `chokidar`: File system watching for auto-sync
+- WebDAV is implemented with raw Node.js `http`/`https` (no client library)
 
-Sync direction determined by comparing local vs. remote timestamps against `lastSyncTime`. Modes: `upload`, `download`, `auto`, `conflict`. Two transfer modes: normal (recursive copy or WebDAV PUT/GET) and pack (ZIP compress first). Downloads auto-create version backups before overwriting.
+## Conventions
 
-## Runtime Data
-
-Config stored at `%APPDATA%/gamesync/GameSync/`:
-- `config.json` — games, targets, settings
-- `bootstrap.json` — custom data directory pointer (if migrated)
-- `versions/<gameId>/` — timestamped ZIP version backups (max 10 by default)
-
-## Dependencies
-
-Only two runtime deps: `adm-zip` (ZIP handling) and `chokidar` (file watching). Node.js 18+ required.
+- No TypeScript, no bundler, no transpilation — raw JS loaded directly
+- All main-process modules are singletons
+- Dark theme via CSS custom properties in `src/renderer/styles/main.css`
+- IDs generated with `Date.now().toString(36) + random`
+- Config supports data directory migration via a bootstrap file in `%APPDATA%`

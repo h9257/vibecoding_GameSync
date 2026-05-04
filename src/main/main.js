@@ -5,7 +5,6 @@ const gameDatabase = require('./game-database');
 const syncEngine = require('./sync-engine');
 const fileWatcher = require('./file-watcher');
 const trayManager = require('./tray');
-const devServer = require('./dev-server');
 
 let mainWindow = null;
 
@@ -155,14 +154,11 @@ if (!gotTheLock) {
     configStore.initPaths();
     configStore.load();
     createWindow();
-    // Start HTTP dev server for browser access
-    devServer.start(3000);
   });
 
   app.on('window-all-closed', () => {
     fileWatcher.stopAll();
     trayManager.destroy();
-    devServer.stop();
     app.quit();
   });
 
