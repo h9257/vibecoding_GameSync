@@ -462,33 +462,63 @@ class Dialogs {
 
   showFilterPresets() {
     const presets = [
-      { name: '日志文件', patterns: ['*.log', '*.log.*'] },
-      { name: '临时文件', patterns: ['*.tmp', '*.temp', '~*'] },
-      { name: '缓存目录', patterns: ['cache/**', 'Cache/**', '__pycache__/**'] },
-      { name: 'Windows 系统', patterns: ['Thumbs.db', 'desktop.ini', '*.lnk'] },
-      { name: '编译产物', patterns: ['*.o', '*.obj', '*.exe', '*.dll'] },
-      { name: 'Git 目录', patterns: ['.git/**', '.gitignore'] }
+      { name: '日志文件', icon: '📄', patterns: ['*.log', '*.log.*'] },
+      { name: '临时文件', icon: '🗑️', patterns: ['*.tmp', '*.temp', '~*'] },
+      { name: '缓存目录', icon: '💾', patterns: ['cache/**', 'Cache/**', '__pycache__/**'] },
+      { name: 'Windows 系统', icon: '🪟', patterns: ['Thumbs.db', 'desktop.ini', '*.lnk'] },
+      { name: '编译产物', icon: '🔨', patterns: ['*.o', '*.obj', '*.exe', '*.dll'] },
+      { name: 'Git 目录', icon: '📂', patterns: ['.git/**', '.gitignore'] }
     ];
 
-    const textarea = document.getElementById('filter-patterns-input');
-    const current = textarea.value.trim();
-    const items = presets.map(p =>
-      `• ${p.name}: ${p.patterns.join(', ')}`
-    ).join('\n');
+    const btn = document.getElementById('btn-filter-presets');
+    let dropdown = document.getElementById('filter-presets-dropdown');
 
-    const choice = prompt(
-      `选择要添加的模板（输入序号）:\n\n` +
-      presets.map((p, i) => `${i + 1}. ${p.name} — ${p.patterns.join(', ')}`).join('\n')
-    );
-
-    if (choice) {
-      const idx = parseInt(choice) - 1;
-      if (idx >= 0 && idx < presets.length) {
-        const newPatterns = presets[idx].patterns.join('\n');
-        textarea.value = current ? current + '\n' + newPatterns : newPatterns;
-        ui.toast(`已添加「${presets[idx].name}」模板`, 'info', 2000);
-      }
+    // Toggle existing dropdown
+    if (dropdown && dropdown.style.display !== 'none') {
+      dropdown.style.display = 'none';
+      return;
     }
+
+    // Create dropdown if not exists
+    if (!dropdown) {
+      dropdown = document.createElement('div');
+      dropdown.id = 'filter-presets-dropdown';
+      document.body.appendChild(dropdown);
+
+      // Close when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!btn.contains(e.target) && !dropdown.contains(e.target)) {
+          dropdown.style.display = 'none';
+        }
+      });
+    }
+
+    // Position dropdown relative to button
+    const rect = btn.getBoundingClientRect();
+    dropdown.style.cssText = `position:fixed;top:${rect.bottom + 4}px;right:${window.innerWidth - rect.right}px;z-index:9999;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px;min-width:220px;box-shadow:var(--shadow-md)`;
+
+    dropdown.innerHTML = presets.map(p => `
+      <div class="preset-filter-item" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-radius:var(--radius-sm);font-size:13px;color:var(--text);transition:background .15s">
+        <span>${p.icon}</span>
+        <span style="flex:1">${p.name}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${p.patterns.length} 条</span>
+      </div>
+    `).join('');
+
+    dropdown.querySelectorAll('.preset-filter-item').forEach((item, i) => {
+      item.addEventListener('mouseenter', () => { item.style.background = 'var(--bg-hover)'; });
+      item.addEventListener('mouseleave', () => { item.style.background = ''; });
+      item.addEventListener('click', () => {
+        const textarea = document.getElementById('filter-patterns-input');
+        const current = textarea.value.trim();
+        const newPatterns = presets[i].patterns.join('\n');
+        textarea.value = current ? current + '\n' + newPatterns : newPatterns;
+        ui.toast(`已添加「${presets[i].name}」模板`, 'info', 2000);
+        dropdown.style.display = 'none';
+      });
+    });
+
+    dropdown.style.display = 'block';
   }
 
   async loadFileTree() {
