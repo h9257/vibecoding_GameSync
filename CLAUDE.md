@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Config
+
+- **user.name:** hanmiao
+- **user.email:** hanmiao20@qq.com
+
 ## Project Overview
 
 GameSync is a Windows-only Electron desktop app for synchronizing game save files across devices. Supports local directory sync and WebDAV remote sync, with optional ZIP pack mode and automatic version backups. Built as a "Vibecoding" project (human-AI conversational collaboration).
