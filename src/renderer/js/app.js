@@ -2,6 +2,9 @@
  * App.js - 应用入口和事件绑定
  */
 
+// Global state
+let currentBatchToastId = null;
+
 // ---- Targets Page Rendering ----
 async function loadTargets() {
   try {
@@ -214,14 +217,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       ui.switchPage('targets');
       return;
     }
-    ui.toast('正在同步所有游戏...', 'info', 3000);
+    currentBatchToastId = ui.toast('正在初始化全量同步...', 'info', 0); // 0 means don't auto-remove
     try {
       const results = await window.api.syncAllGames();
       const success = results.filter(r => r.status === 'success').length;
       const errors = results.filter(r => r.status === 'error').length;
+      
+      ui.removeToast(currentBatchToastId);
+      currentBatchToastId = null;
+      
       ui.toast(`同步完成: ${success} 成功, ${errors} 失败`, success > 0 ? 'success' : 'error');
       await gameList.load();
     } catch (e) {
+      if (currentBatchToastId) {
+        ui.removeToast(currentBatchToastId);
+        currentBatchToastId = null;
+      }
       ui.toast(`同步失败: ${e.message}`, 'error');
     }
   });
@@ -273,6 +284,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // IPC events from main process
   if (window.api.onSyncProgress) {
     window.api.onSyncProgress((data) => {
+      if (data.gameId === 'all' && currentBatchToastId) {
+        ui.updateToast(currentBatchToastId, data.message, 'info');
+      }
       ui.updateStatusBar({ status: 'syncing', message: data.message });
     });
   }

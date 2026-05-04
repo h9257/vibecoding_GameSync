@@ -53,6 +53,18 @@ class UIManager {
     return id;
   }
 
+  updateToast(id, message, type = 'info') {
+    const toast = document.getElementById(`toast-${id}`);
+    if (toast) {
+      const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+      toast.className = `toast ${type}`;
+      const iconSpan = toast.querySelector('.toast-icon');
+      const msgSpan = toast.querySelector('.toast-message');
+      if (iconSpan) iconSpan.textContent = icons[type] || icons.info;
+      if (msgSpan) msgSpan.textContent = message;
+    }
+  }
+
   removeToast(id) {
     const toast = document.getElementById(`toast-${id}`);
     if (toast) {

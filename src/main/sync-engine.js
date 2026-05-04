@@ -73,18 +73,19 @@ class SyncEngine {
    * Scan a directory and return a file tree structure for the UI.
    * Each node: { name, path, type: 'file'|'dir', size?, children?, excluded? }
    */
-  scanDirectory(dirPath, excludePatterns = [], basePath = null) {
+  async scanDirectory(dirPath, excludePatterns = [], basePath = null) {
     if (!basePath) basePath = dirPath;
     if (!fs.existsSync(dirPath)) return [];
     const result = [];
     try {
-      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
         const relPath = path.relative(basePath, fullPath);
         const excluded = this.shouldExclude(relPath, excludePatterns);
 
         if (entry.isDirectory()) {
-          const children = this.scanDirectory(fullPath, excludePatterns, basePath);
+          const children = await this.scanDirectory(fullPath, excludePatterns, basePath);
           result.push({
             name: entry.name,
             relPath,
@@ -94,7 +95,10 @@ class SyncEngine {
           });
         } else {
           let size = 0;
-          try { size = fs.statSync(fullPath).size; } catch {}
+          try { 
+            const stat = await fs.promises.stat(fullPath);
+            size = stat.size; 
+          } catch {}
           result.push({
             name: entry.name,
             relPath,
@@ -175,10 +179,32 @@ class SyncEngine {
   async syncAllGames() {
     const games = configStore.getGames();
     const results = [];
-    for (const game of games) {
-      try { results.push(await this.syncGame(game.id, 'auto')); }
-      catch (e) { results.push({ status: 'error', gameId: game.id, error: e.message }); }
+    const total = games.length;
+    if (total === 0) return results;
+
+    for (let i = 0; i < total; i++) {
+      const game = games[i];
+      this.sendProgress({ 
+        gameId: 'all', 
+        status: 'batch_progress', 
+        current: i + 1, 
+        total, 
+        gameName: game.name,
+        message: `正在同步所有游戏 (${i + 1}/${total}): ${game.name}` 
+      });
+      
+      try { 
+        results.push(await this.syncGame(game.id, 'auto')); 
+      } catch (e) { 
+        results.push({ status: 'error', gameId: game.id, error: e.message }); 
+      }
     }
+
+    this.sendProgress({ 
+      gameId: 'all', 
+      status: 'batch_complete', 
+      message: `全量同步完成，共处理 ${total} 个项目` 
+    });
     return results;
   }
 
@@ -190,7 +216,7 @@ class SyncEngine {
     const target = game.syncTargetId ? configStore.getSyncTarget(game.syncTargetId) : targets[0];
     if (!target) return { status: 'no_target' };
 
-    const localInfo = this.getLocalInfo(game.localPath);
+    const localInfo = await this.getLocalInfo(game.localPath);
     let remoteInfo;
     if (game.packMode) {
       remoteInfo = await this.getRemoteInfoPacked(game, target);
@@ -216,7 +242,7 @@ class SyncEngine {
   }
 
   async determineDirection(game, target) {
-    const localInfo = this.getLocalInfo(game.localPath);
+    const localInfo = await this.getLocalInfo(game.localPath);
     const remotePath = this.getRemotePath(game, target);
     const remoteInfo = await this.getRemoteInfo(remotePath, target);
     if (!localInfo.exists && !remoteInfo.exists) return 'none';
@@ -304,7 +330,7 @@ class SyncEngine {
       const remoteDir = path.join(target.path, 'GameSync');
       const remoteZipPath = path.join(remoteDir, zipFileName);
       if (!fs.existsSync(remoteZipPath)) throw new Error('远端压缩包不存在');
-      zipBuffer = fs.readFileSync(remoteZipPath);
+      zipBuffer = await fs.promises.readFile(remoteZipPath);
     } else if (target.type === 'webdav') {
       const base = target.url.replace(/\/+$/, '');
       const remotePath = target.remotePath || '/GameSync';
@@ -316,9 +342,14 @@ class SyncEngine {
     this.sendProgress({ gameId: game.id, status: 'downloading', message: '正在解压还原...' });
 
     // Clear local path and extract
-    fs.mkdirSync(game.localPath, { recursive: true });
+    await fs.promises.mkdir(game.localPath, { recursive: true });
     const zip = new AdmZip(zipBuffer);
-    zip.extractAllTo(game.localPath, true);
+    await new Promise((resolve, reject) => {
+      zip.extractAllToAsync(game.localPath, true, false, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
   }
 
   async createVersionBackup(game) {
@@ -327,10 +358,21 @@ class SyncEngine {
     const ts = new Date().toISOString().replace(/[:.]/g, '-');
     const zipPath = path.join(versionsDir, `${ts}.zip`);
 
-    // Zip the save folder
+    // Zip the save folder asynchronously
     const zip = new AdmZip();
-    zip.addLocalFolder(game.localPath);
-    zip.writeZip(zipPath);
+    await new Promise((resolve, reject) => {
+      zip.addLocalFolderAsync(game.localPath, (success, err) => {
+        if (!success) reject(err || new Error('Zip add failed'));
+        else resolve();
+      });
+    });
+    
+    await new Promise((resolve, reject) => {
+      zip.writeZip(zipPath, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
 
     this.cleanOldVersions(versionsDir, configStore.getSettings().maxVersions || 10);
     return { versionId: ts, path: zipPath };
@@ -379,38 +421,44 @@ class SyncEngine {
     }
   }
 
-  getLocalInfo(dirPath) {
+  async getLocalInfo(dirPath) {
     if (!fs.existsSync(dirPath)) return { exists: false, fileCount: 0, totalSize: 0, latestModified: 0 };
     let fc = 0, ts = 0, lm = 0;
-    const walk = (d) => {
+    const walk = async (d) => {
       try {
-        for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const entries = await fs.promises.readdir(d, { withFileTypes: true });
+        for (const e of entries) {
           const fp = path.join(d, e.name);
-          if (e.isDirectory()) walk(fp);
-          else { fc++; const s = fs.statSync(fp); ts += s.size; if (s.mtimeMs > lm) lm = s.mtimeMs; }
+          if (e.isDirectory()) await walk(fp);
+          else {
+            fc++;
+            const s = await fs.promises.stat(fp);
+            ts += s.size;
+            if (s.mtimeMs > lm) lm = s.mtimeMs;
+          }
         }
       } catch {}
     };
-    walk(dirPath);
+    await walk(dirPath);
     return { exists: true, fileCount: fc, totalSize: ts, totalSizeFormatted: this.formatSize(ts), latestModified: lm, latestModifiedDate: new Date(lm).toLocaleString('zh-CN') };
   }
 
   async getRemoteInfo(remotePath, target) {
-    if (target.type === 'local') return this.getLocalInfo(remotePath);
+    if (target.type === 'local') return await this.getLocalInfo(remotePath);
     if (target.type === 'webdav') return await this.webdavGetInfo(remotePath, target);
     return { exists: false };
   }
 
-  getRemoteInfoPacked(game, target) {
+  async getRemoteInfoPacked(game, target) {
     const zipFileName = this.sanitizeName(game.name) + '.zip';
     if (target.type === 'local') {
       const zipPath = path.join(target.path, 'GameSync', zipFileName);
       if (!fs.existsSync(zipPath)) return { exists: false, fileCount: 0, totalSize: 0, latestModified: 0 };
-      const stat = fs.statSync(zipPath);
+      const stat = await fs.promises.stat(zipPath);
       return { exists: true, fileCount: 1, totalSize: stat.size, totalSizeFormatted: this.formatSize(stat.size), latestModified: stat.mtimeMs, latestModifiedDate: new Date(stat.mtimeMs).toLocaleString('zh-CN'), packed: true };
     }
     // For WebDAV packed, fall back to normal remote info on the parent dir
-    return this.getRemoteInfo(`${target.remotePath || '/GameSync'}`, target);
+    return await this.getRemoteInfo(`${target.remotePath || '/GameSync'}`, target);
   }
 
   getRemotePath(game, target) {
@@ -425,13 +473,17 @@ class SyncEngine {
   async copyDirectory(src, dest, excludePatterns = [], basePath = null) {
     if (!basePath) basePath = src;
     if (!fs.existsSync(src)) throw new Error(`源路径不存在: ${src}`);
-    fs.mkdirSync(dest, { recursive: true });
-    for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    await fs.promises.mkdir(dest, { recursive: true });
+    const entries = await fs.promises.readdir(src, { withFileTypes: true });
+    for (const e of entries) {
       const s = path.join(src, e.name), d = path.join(dest, e.name);
       const relPath = path.relative(basePath, s);
       if (this.shouldExclude(relPath, excludePatterns)) continue;
-      if (e.isDirectory()) await this.copyDirectory(s, d, excludePatterns, basePath);
-      else fs.copyFileSync(s, d);
+      if (e.isDirectory()) {
+        await this.copyDirectory(s, d, excludePatterns, basePath);
+      } else {
+        await fs.promises.copyFile(s, d);
+      }
     }
   }
 
@@ -500,13 +552,14 @@ class SyncEngine {
     const parts = remotePath.split('/').filter(Boolean);
     let cp = '';
     for (const p of parts) { cp += '/' + p; await this.webdavEnsureDir(`${base}${cp}`, target); }
-    for (const e of fs.readdirSync(localDir, { withFileTypes: true })) {
+    const entries = await fs.promises.readdir(localDir, { withFileTypes: true });
+    for (const e of entries) {
       const lp = path.join(localDir, e.name);
       const relPath = path.relative(basePath, lp);
       if (this.shouldExclude(relPath, excludePatterns)) continue;
       if (e.isDirectory()) await this.webdavUploadDir(lp, `${remotePath}/${e.name}`, target, excludePatterns, basePath);
       else {
-        const data = fs.readFileSync(lp);
+        const data = await fs.promises.readFile(lp);
         await this._webdavReq('PUT', `${base}${remotePath}/${e.name}`, target, { headers: { 'Content-Type': 'application/octet-stream' }, body: data });
       }
     }
@@ -514,7 +567,7 @@ class SyncEngine {
 
   async webdavDownloadDir(remotePath, localDir, target) {
     const base = target.url.replace(/\/+$/, '');
-    fs.mkdirSync(localDir, { recursive: true });
+    await fs.promises.mkdir(localDir, { recursive: true });
     const res = await this._webdavReq('PROPFIND', `${base}${remotePath}/`, target, {
       headers: { 'Content-Type': 'application/xml', 'Depth': '1' },
       body: '<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:allprop/></D:propfind>'
@@ -526,7 +579,7 @@ class SyncEngine {
       if (e.isDir) await this.webdavDownloadDir(`${remotePath}/${e.name}`, lp, target);
       else {
         const r = await this._webdavReq('GET', `${base}${remotePath}/${e.name}`, target);
-        if (r.status === 200) fs.writeFileSync(lp, r.body);
+        if (r.status === 200) await fs.promises.writeFile(lp, r.body);
       }
     }
   }
